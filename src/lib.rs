@@ -24,11 +24,23 @@ extern {
     // fn jl_git_commit() -> *const libc::c_char;
 
     // Exception handling
-    fn jl_exception_occurred() -> *mut jl_value_t;
+    fn jl_exception_occurred() -> jl_value_t;
     fn jl_exception_clear();
-    fn jl_throw(e: *mut jl_value_t);
+    fn jl_throw(e: jl_value_t);
     fn jl_rethrow();
-    fn jl_rethrow_other(e: *mut jl_value_t);
+    fn jl_rethrow_other(e: jl_value_t);
+}
+
+macro_rules! check_err {
+    () => {{
+        unsafe {
+            let exoccur = jl_exception_occurred();
+            if !exoccur.is_null() {
+                println!("{}", "Error occurred"); // TODO: Actual error text
+            }
+            jl_exception_clear();
+        }
+    }};
 }
 
 pub struct Julia;
@@ -41,7 +53,15 @@ impl Julia {
             jl_init(dir_ptr);
             assert!(jl_is_initialized() == 1, "Failed to initialize Julia")
         }
-        Julia
+        Julia {}
+    }
+
+    pub fn eval_string(&self, code: &str) -> jl_value_t {
+        let code_c = std::ffi::CString::new(code).unwrap();
+        let code_ptr = code_c.as_ptr();
+        let res = unsafe { jl_eval_string(code_ptr) };
+        check_err!();
+        res
     }
 }
 
